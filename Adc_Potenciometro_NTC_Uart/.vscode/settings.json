@@ -13,7 +13,6 @@
   "clangd.arguments": [
     "--background-index",
     "--query-driver=**",
-    "--compile-commands-dir=c:\\Users\\truji\\Intensidad_LEDRGB\\build"
-  ],
-  "idf.flashType": "UART"
+    "--compile-commands-dir=c:\\Users\\truji\\Adc_Potenciometro_NTC_Uart\\build"
+  ]
 }

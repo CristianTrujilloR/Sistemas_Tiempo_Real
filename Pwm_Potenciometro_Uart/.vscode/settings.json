@@ -13,7 +13,7 @@
   "clangd.arguments": [
     "--background-index",
     "--query-driver=**",
-    "--compile-commands-dir=c:\\Users\\truji\\Intensidad_LEDRGB\\build"
+    "--compile-commands-dir=c:\\Sistemas_Tiempo_Real\\Pwm_Potenciometro\\build"
   ],
   "idf.flashType": "UART"
 }

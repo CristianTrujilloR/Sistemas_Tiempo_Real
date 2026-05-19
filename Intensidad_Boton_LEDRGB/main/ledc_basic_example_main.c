@@ -174,6 +174,7 @@ void app_main(void)
         if (button_pressed(button_rgb1.button_red.gpio_num))
         {
             printf("Boton rojo presionado\n");
+            printf("porcentaje rojo actual: %d\n", percentage_red);
 
             // Apaga otros colores
             percentage_green = 0;
@@ -198,6 +199,7 @@ void app_main(void)
         if (button_pressed(button_rgb1.button_green.gpio_num))
         {
             printf("Boton verde presionado\n");
+            printf("porcentaje_green: %d\n", percentage_green);
 
             // Apaga otros colores
             percentage_red = 0;
@@ -222,6 +224,7 @@ void app_main(void)
         if (button_pressed(button_rgb1.button_blue.gpio_num))
         {
             printf("Boton azul presionado\n");
+            printf("porcentaje azul actual: %d\n", percentage_blue);
 
             // Apaga otros colores
             percentage_red = 0;
