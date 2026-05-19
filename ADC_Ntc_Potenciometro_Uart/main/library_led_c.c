@@ -1,13 +1,15 @@
 #include "library_led_c.h"
 
+#include <string.h>
+
+#include <stdlib.h>
+
 /* =====================================================
-   CONFIGURAR PWM RGB
+   CONFIG PWM RGB
    ===================================================== */
+
 void config_led_rgb(led_rgb_t *led_rgb)
 {
-    /* =====================================================
-       TIMER PWM
-       ===================================================== */
     ledc_timer_config_t ledc_timer = {
 
         .speed_mode       = led_rgb->speed_mode,
@@ -25,9 +27,6 @@ void config_led_rgb(led_rgb_t *led_rgb)
         ledc_timer_config(&ledc_timer)
     );
 
-    /* =====================================================
-       CANALES RGB
-       ===================================================== */
     ledc_channel_config_t channels[3] = {
 
         {
@@ -70,8 +69,9 @@ void config_led_rgb(led_rgb_t *led_rgb)
 }
 
 /* =====================================================
-   CONFIGURAR BOTÓN AUXILIAR
+   CONFIG BOTÓN
    ===================================================== */
+
 void config_buttons_rgb(button_rgb_t *button_rgb)
 {
     gpio_config_t button_config = {
@@ -94,15 +94,15 @@ void config_buttons_rgb(button_rgb_t *button_rgb)
 }
 
 /* =====================================================
-   ENVIAR PWM A RGB
+   PWM RGB
    ===================================================== */
+
 void set_led_rgb_given_values(
     led_rgb_t *led_rgb,
     uint32_t duty_red,
     uint32_t duty_green,
     uint32_t duty_blue)
 {
-    /* RED */
     ledc_set_duty(
         led_rgb->speed_mode,
         led_rgb->led_red.channel,
@@ -112,7 +112,6 @@ void set_led_rgb_given_values(
         led_rgb->speed_mode,
         led_rgb->led_red.channel);
 
-    /* GREEN */
     ledc_set_duty(
         led_rgb->speed_mode,
         led_rgb->led_green.channel,
@@ -122,7 +121,6 @@ void set_led_rgb_given_values(
         led_rgb->speed_mode,
         led_rgb->led_green.channel);
 
-    /* BLUE */
     ledc_set_duty(
         led_rgb->speed_mode,
         led_rgb->led_blue.channel,
@@ -136,6 +134,7 @@ void set_led_rgb_given_values(
 /* =====================================================
    APAGAR RGB
    ===================================================== */
+
 void led_rgb_off(led_rgb_t *led_rgb)
 {
     uint32_t max_duty =
@@ -149,8 +148,9 @@ void led_rgb_off(led_rgb_t *led_rgb)
 }
 
 /* =====================================================
-   ACTIVAR SOLO UN COLOR
+   COLOR ÚNICO
    ===================================================== */
+
 void led_rgb_set_single_color(
     led_rgb_t *led_rgb,
     uint32_t pwm,
@@ -167,15 +167,15 @@ void led_rgb_set_single_color(
 
     switch(color)
     {
-        case 'R':
+        case 'r':
             red_pwm = pwm;
             break;
 
-        case 'G':
+        case 'g':
             green_pwm = pwm;
             break;
 
-        case 'B':
+        case 'b':
             blue_pwm = pwm;
             break;
 
@@ -188,4 +188,169 @@ void led_rgb_set_single_color(
         red_pwm,
         green_pwm,
         blue_pwm);
+}
+
+/* =====================================================
+   ADC CALIBRADO
+   ===================================================== */
+
+int read_adc_calibrated_mv(
+    adc_oneshot_unit_handle_t adc_handle,
+    adc_cali_handle_t adc_cali_handle,
+    adc_channel_t channel)
+{
+    int raw = 0;
+
+    int voltage = 0;
+
+    int samples = 16;
+
+    int raw_sum = 0;
+
+    for(int i = 0; i < samples; i++)
+    {
+        adc_oneshot_read(
+            adc_handle,
+            channel,
+            &raw);
+
+        raw_sum += raw;
+    }
+
+    raw = raw_sum / samples;
+
+    adc_cali_raw_to_voltage(
+        adc_cali_handle,
+        raw,
+        &voltage);
+
+    return voltage;
+}
+
+/* =====================================================
+   CALCULAR TEMPERATURA NTC
+   ===================================================== */
+
+float calculate_ntc_temperature(
+    int voltage_mv)
+{
+    float voltage =
+        voltage_mv / 1000.0f;
+
+    if(voltage <= 0.0f)
+    {
+        return -100.0f;
+    }
+
+    float resistance_ntc =
+        R_FIJA *
+        ((VOLTAJE_ENTRADA / voltage) - 1.0f);
+    float steinhart;
+
+    steinhart =
+        resistance_ntc / NTC_R_NOMINAL;
+
+    steinhart = log(steinhart);
+
+    steinhart /= NTC_BETA;
+
+    steinhart += 1.0f / NTC_TEMP_NOMINAL;
+
+    steinhart = 1.0f / steinhart;
+
+    steinhart -= 273.15f;
+
+    return steinhart;
+}
+
+/* =====================================================
+   OBTENER COLOR
+   ===================================================== */
+
+char get_color_from_temperature(
+    float temperature,
+    temp_range_t *ranges)
+{
+    if(temperature >= ranges->red_min &&
+       temperature <= ranges->red_max)
+    {
+        return 'r';
+    }
+
+    if(temperature >= ranges->green_min &&
+       temperature <= ranges->green_max)
+    {
+        return 'g';
+    }
+
+    if(temperature >= ranges->blue_min &&
+       temperature <= ranges->blue_max)
+    {
+        return 'b';
+    }
+
+    return 'r';
+}
+
+/* =====================================================
+   PARSE UART
+   ===================================================== */
+
+void parse_temperature_command(
+    char *data,
+    temp_range_t *ranges)
+{
+    char color;
+
+    int min;
+
+    int max;
+
+    if(sscanf(data, "%c %d %d",
+              &color,
+              &min,
+              &max) == 3)
+    {
+        switch(color)
+        {
+            case 'R':
+            case 'r':
+
+                ranges->red_min = min;
+
+                ranges->red_max = max;
+
+                printf("Rango ROJO actualizado\n");
+
+                break;
+
+            case 'G':
+            case 'g':
+
+                ranges->green_min = min;
+
+                ranges->green_max = max;
+
+                printf("Rango VERDE actualizado\n");
+
+                break;
+
+            case 'B':
+            case 'b':
+
+                ranges->blue_min = min;
+
+                ranges->blue_max = max;
+
+                printf("Rango AZUL actualizado\n");
+
+                break;
+
+            default:
+
+                printf("Comando inválido\n");
+
+                break;
+        }
+    }
 }

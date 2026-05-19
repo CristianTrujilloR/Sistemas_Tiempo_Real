@@ -13,6 +13,7 @@
   "clangd.arguments": [
     "--background-index",
     "--query-driver=**",
-    "--compile-commands-dir=c:\\Users\\truji\\Adc_Potenciometro_NTC_Uart\\build"
-  ]
+    "--compile-commands-dir=c:\\Sistemas_Tiempo_Real\\Pwm_Potenciometro\\build"
+  ],
+  "idf.flashType": "UART"
 }
