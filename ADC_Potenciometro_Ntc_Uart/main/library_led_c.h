@@ -82,6 +82,8 @@ typedef struct
 {
     button_t button_aux;
 
+    button_t button_temperature;
+
 } button_rgb_t;
 
 /* =====================================================
@@ -115,18 +117,22 @@ void set_led_rgb_given_values(
     uint32_t duty_green,
     uint32_t duty_blue);
 
-void set_led_rgb_percentage_given_values(
-    led_rgb_t *led_rgb,
-    int percentage_red,
-    int percentage_green,
-    int percentage_blue);
-
 void led_rgb_off(led_rgb_t *led_rgb);
 
 void led_rgb_set_single_color(
     led_rgb_t *led_rgb,
     uint32_t pwm,
     char color);
+
+/* =====================================================
+   RGB MÚLTIPLE TEMPERATURA
+   ===================================================== */
+
+void set_rgb_from_temperature(
+    led_rgb_t *led_rgb,
+    float temperature,
+    temp_range_t *ranges,
+    uint32_t pwm);
 
 /* =====================================================
    FUNCIONES ADC / NTC
@@ -151,5 +157,14 @@ char get_color_from_temperature(
 void parse_temperature_command(
     char *data,
     temp_range_t *ranges);
+
+/* =====================================================
+   CONFIG SISTEMA UART
+   ===================================================== */
+
+void parse_system_command(
+    char *data,
+    int *print_interval_ms,
+    char *temperature_unit);
 
 #endif

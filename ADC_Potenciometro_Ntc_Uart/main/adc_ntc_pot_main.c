@@ -1,29 +1,19 @@
 /* =====================================================
    PROYECTO:
-   RGB PWM + POT ADC + NTC ADC + UART
+   RGB PWM + NTC ADC + UART
    ESP32-C6
 
    FUNCIONES:
-   - Potenciómetro controla brillo PWM
    - NTC controla color automáticamente
+   - Mezcla colores RGB
    - UART configura rangos térmicos
+   - UART controla intensidad PWM
    - ADC calibrado
    - PWM RGB
    - Botón diagnóstico
-   - Corrección transición térmica RGB
-   - Conversión correcta NTC 100k Beta 4190
-
-   CONEXIÓN NTC:
-
-          3.3V
-            |
-          [NTC]
-            |
-            +---- GPIO1 ADC
-            |
-         [100k]
-            |
-           GND
+   - Botón cambio temperatura
+   - Impresión automática temperatura
+   - Celsius / Kelvin / Fahrenheit
 
    ===================================================== */
 
@@ -46,7 +36,7 @@
 #include "library_led_c.h"
 
 /* =====================================================
-   CONFIGURACIÓN PWM
+   CONFIG PWM
    ===================================================== */
 
 #define LEDC_TIMER              LEDC_TIMER_0
@@ -70,23 +60,15 @@
 #define LED_RGB1_BLUE_GPIO      GPIO_NUM_5
 
 /* =====================================================
-   BOTÓN AUXILIAR
+   BOTONES
    ===================================================== */
 
 #define BUTTON_AUX_GPIO         GPIO_NUM_22
 
-/* =====================================================
-   ADC POTENCIÓMETRO
-
-   GPIO0 -> ADC_CHANNEL_0
-   ===================================================== */
-
-#define POT_ADC_CHANNEL         ADC_CHANNEL_0
+#define BUTTON_TEMPERATURE_GPIO GPIO_NUM_21
 
 /* =====================================================
-   ADC NTC
-
-   GPIO1 -> ADC_CHANNEL_1
+   ADC
    ===================================================== */
 
 #define NTC_ADC_CHANNEL         ADC_CHANNEL_1
@@ -101,8 +83,6 @@
 
 /* =====================================================
    RANGOS TEMPERATURA
-
-   Valores iniciales
    ===================================================== */
 
 temp_range_t temp_ranges = {
@@ -118,9 +98,7 @@ temp_range_t temp_ranges = {
 };
 
 /* =====================================================
-   FUNCIÓN DEBOUNCE
-
-   Elimina rebotes mecánicos
+   DEBOUNCE
    ===================================================== */
 
 static int button_pressed(gpio_num_t gpio)
@@ -150,7 +128,7 @@ static int button_pressed(gpio_num_t gpio)
 void app_main(void)
 {
     /* =====================================================
-       CONFIGURACIÓN RGB
+       CONFIG RGB
        ===================================================== */
 
     led_rgb_t led_rgb1 = {
@@ -183,19 +161,19 @@ void app_main(void)
     };
 
     /* =====================================================
-       CONFIGURACIÓN BOTÓN
+       CONFIG BOTONES
        ===================================================== */
 
     button_rgb_t button_rgb1 = {
 
         .button_aux = {
             .gpio_num = BUTTON_AUX_GPIO,
+        },
+
+        .button_temperature = {
+            .gpio_num = BUTTON_TEMPERATURE_GPIO,
         }
     };
-
-    /* =====================================================
-       INICIALIZAR RGB Y BOTÓN
-       ===================================================== */
 
     config_led_rgb(&led_rgb1);
 
@@ -204,7 +182,7 @@ void app_main(void)
     led_rgb_off(&led_rgb1);
 
     /* =====================================================
-       CONFIGURAR UART
+       UART
        ===================================================== */
 
     uart_driver_install(
@@ -217,7 +195,7 @@ void app_main(void)
     );
 
     /* =====================================================
-       CONFIGURAR ADC
+       ADC
        ===================================================== */
 
     adc_oneshot_unit_handle_t adc1_handle;
@@ -232,10 +210,6 @@ void app_main(void)
         &adc1_handle
     );
 
-    /* =====================================================
-       CONFIGURAR CANALES ADC
-       ===================================================== */
-
     adc_oneshot_chan_cfg_t adc_config = {
 
         .bitwidth = ADC_BITWIDTH_12,
@@ -243,23 +217,11 @@ void app_main(void)
         .atten = ADC_ATTEN_DB_12,
     };
 
-    /* POT */
-    adc_oneshot_config_channel(
-        adc1_handle,
-        POT_ADC_CHANNEL,
-        &adc_config
-    );
-
-    /* NTC */
     adc_oneshot_config_channel(
         adc1_handle,
         NTC_ADC_CHANNEL,
         &adc_config
     );
-
-    /* =====================================================
-       CALIBRACIÓN ADC
-       ===================================================== */
 
     adc_cali_handle_t adc1_cali_handle = NULL;
 
@@ -267,7 +229,7 @@ void app_main(void)
 
         .unit_id = ADC_UNIT_1,
 
-        .chan = POT_ADC_CHANNEL,
+        .chan = NTC_ADC_CHANNEL,
 
         .atten = ADC_ATTEN_DB_12,
 
@@ -281,36 +243,28 @@ void app_main(void)
 
     printf("ADC calibrado correctamente\n");
 
-    /* =====================================================
-       BUFFER UART
-       ===================================================== */
-
     uint8_t data[50];
 
     /* =====================================================
-       VARIABLES COLOR
-
-       current_color:
-       color actual
-
-       previous_color:
-       detecta transición térmica
+       CONFIG IMPRESIÓN
        ===================================================== */
 
-    char current_color = 'r';
+    int print_interval_ms = 3000;
 
-    char previous_color = 'x';
+    char temperature_unit = 'C';
+
+    TickType_t last_print_time = 0;
+
+    /* =====================================================
+       PWM UART
+       ===================================================== */
+
+    int pwm_percentage = 100;
 
     while(1)
     {
         /* =====================================================
-           UART CONFIG RANGOS
-
-           FORMATO:
-
-           R 0 15
-           G 16 30
-           B 31 50
+           UART
            ===================================================== */
 
         int len = uart_read_bytes(
@@ -328,24 +282,107 @@ void app_main(void)
                 (char*)data,
                 &temp_ranges
             );
+
+            parse_system_command(
+                (char*)data,
+                &print_interval_ms,
+                &temperature_unit
+            );
+
+            /* =====================================================
+               INTENSIDAD PWM
+
+               I 0 -> OFF
+               I 1 -> 20%
+               I 2 -> 40%
+               I 3 -> 60%
+               I 4 -> 80%
+               I 5 -> 100%
+               ===================================================== */
+
+            char command;
+
+            int level;
+
+            if(sscanf((char*)data,
+                      "%c %d",
+                      &command,
+                      &level) == 2)
+            {
+                if(command == 'I' ||
+                   command == 'i')
+                {
+                    switch(level)
+                    {
+                        case 0:
+                            pwm_percentage = 0;
+                            printf("PWM 0%%\n");
+                            break;
+
+                        case 1:
+                            pwm_percentage = 20;
+                            printf("PWM 20%%\n");
+                            break;
+
+                        case 2:
+                            pwm_percentage = 40;
+                            printf("PWM 40%%\n");
+                            break;
+
+                        case 3:
+                            pwm_percentage = 60;
+                            printf("PWM 60%%\n");
+                            break;
+
+                        case 4:
+                            pwm_percentage = 80;
+                            printf("PWM 80%%\n");
+                            break;
+
+                        case 5:
+                            pwm_percentage = 100;
+                            printf("PWM 100%%\n");
+                            break;
+
+                        default:
+                            printf("Nivel inválido\n");
+                            break;
+                    }
+                }
+            }
         }
 
         /* =====================================================
-           LEER POTENCIÓMETRO
+           BOTÓN TEMPERATURA
 
-           Controla brillo PWM
+           Celsius -> Kelvin -> Fahrenheit
            ===================================================== */
 
-        int pot_mv = read_adc_calibrated_mv(
-            adc1_handle,
-            adc1_cali_handle,
-            POT_ADC_CHANNEL
-        );
+        if(button_pressed(
+            button_rgb1.button_temperature.gpio_num))
+        {
+            if(temperature_unit == 'C')
+            {
+                temperature_unit = 'K';
+
+                printf("Unidad: Kelvin\n");
+            }
+            else if(temperature_unit == 'K')
+            {
+                temperature_unit = 'F';
+
+                printf("Unidad: Fahrenheit\n");
+            }
+            else
+            {
+                temperature_unit = 'C';
+
+                printf("Unidad: Celsius\n");
+            }
+        }
 
         /* =====================================================
            LEER NTC
-
-           Voltaje calibrado
            ===================================================== */
 
         int ntc_mv = read_adc_calibrated_mv(
@@ -353,62 +390,75 @@ void app_main(void)
             adc1_cali_handle,
             NTC_ADC_CHANNEL
         );
-        /* =====================================================
-           CALCULAR TEMPERATURA
 
-           Conversión:
-           - Beta 4190
-           - NTC 100k
-           - Steinhart-Hart
+        /* =====================================================
+           TEMPERATURA REAL CELSIUS
            ===================================================== */
 
         float temperature =
             calculate_ntc_temperature(ntc_mv);
 
         /* =====================================================
-           OBTENER COLOR SEGÚN TEMPERATURA
+           TEMPERATURA VISUAL
            ===================================================== */
 
-        current_color =
-            get_color_from_temperature(
-                temperature,
-                &temp_ranges
-            );
+        float display_temperature = temperature;
+
+        if(temperature_unit == 'K')
+        {
+            display_temperature =
+                temperature + 273.15f;
+        }
+
+        if(temperature_unit == 'F')
+        {
+            display_temperature =
+                (temperature * 1.8f) + 32.0f;
+        }
 
         /* =====================================================
-           PWM DESDE POTENCIÓMETRO
+           IMPRESIÓN AUTOMÁTICA
+           ===================================================== */
 
-           RGB ÁNODO COMÚN:
-           duty bajo = más brillo
+        if((xTaskGetTickCount() - last_print_time) >=
+            pdMS_TO_TICKS(print_interval_ms))
+        {
+            printf("\n");
+
+            printf("======= TEMPERATURA =======\n");
+
+            printf(
+                "Temperatura: %.2f %c\n",
+                display_temperature,
+                temperature_unit
+            );
+
+            printf("===========================\n\n");
+
+            last_print_time =
+                xTaskGetTickCount();
+        }
+
+        /* =====================================================
+           PWM UART
            ===================================================== */
 
         uint32_t pwm =
             PWM_MAX_DUTY -
-            ((pot_mv * PWM_MAX_DUTY) / 3300);
+            ((pwm_percentage *
+            PWM_MAX_DUTY) / 100);
 
         /* =====================================================
-           DETECTAR CAMBIO DE COLOR
+           RGB DINÁMICO
 
-           Evita apagado momentáneo
+           Mezcla colores automáticamente
            ===================================================== */
 
-        if(current_color != previous_color)
-        {
-            led_rgb_off(&led_rgb1);
-
-            vTaskDelay(pdMS_TO_TICKS(5));
-
-            previous_color = current_color;
-        }
-
-        /* =====================================================
-           ACTUALIZAR RGB
-           ===================================================== */
-
-        led_rgb_set_single_color(
+        set_rgb_from_temperature(
             &led_rgb1,
-            pwm,
-            current_color
+            temperature,
+            &temp_ranges,
+            pwm
         );
 
         /* =====================================================
@@ -421,20 +471,19 @@ void app_main(void)
 
             printf("=========== NTC INFO ===========\n");
 
-            printf("Temperatura : %.2f C\n",
-                   temperature);
+            printf(
+                "Temperatura : %.2f %c\n",
+                display_temperature,
+                temperature_unit
+            );
 
             printf("NTC mV      : %d\n",
                    ntc_mv);
 
-            printf("POT mV      : %d\n",
-                   pot_mv);
+            printf("RGB dinámico activo\n");
 
-            printf("Color       : %c\n",
-                   current_color);
-
-            printf("PWM         : %lu\n",
-                   pwm);
+            printf("PWM %%       : %d\n",
+                   pwm_percentage);
 
             printf("RANGO R     : %d - %d\n",
                    temp_ranges.red_min,
@@ -448,12 +497,14 @@ void app_main(void)
                    temp_ranges.blue_min,
                    temp_ranges.blue_max);
 
+            printf("Tiempo ms   : %d\n",
+                   print_interval_ms);
+
+            printf("Unidad      : %c\n",
+                   temperature_unit);
+
             printf("================================\n\n");
         }
-
-        /* =====================================================
-           DELAY PRINCIPAL
-           ===================================================== */
 
         vTaskDelay(pdMS_TO_TICKS(50));
     }

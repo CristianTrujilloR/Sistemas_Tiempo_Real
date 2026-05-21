@@ -69,7 +69,7 @@ void config_led_rgb(led_rgb_t *led_rgb)
 }
 
 /* =====================================================
-   CONFIG BOTÓN
+   CONFIG BOTONES
    ===================================================== */
 
 void config_buttons_rgb(button_rgb_t *button_rgb)
@@ -77,7 +77,9 @@ void config_buttons_rgb(button_rgb_t *button_rgb)
     gpio_config_t button_config = {
 
         .pin_bit_mask =
-            (1ULL << button_rgb->button_aux.gpio_num),
+            (1ULL << button_rgb->button_aux.gpio_num) |
+
+            (1ULL << button_rgb->button_temperature.gpio_num),
 
         .mode = GPIO_MODE_INPUT,
 
@@ -191,6 +193,50 @@ void led_rgb_set_single_color(
 }
 
 /* =====================================================
+   RGB MÚLTIPLE TEMPERATURA
+   ===================================================== */
+
+void set_rgb_from_temperature(
+    led_rgb_t *led_rgb,
+    float temperature,
+    temp_range_t *ranges,
+    uint32_t pwm)
+{
+    uint32_t max_duty =
+        (1 << led_rgb->duty_resolution) - 1;
+
+    uint32_t red_pwm = max_duty;
+
+    uint32_t green_pwm = max_duty;
+
+    uint32_t blue_pwm = max_duty;
+
+    if(temperature >= ranges->red_min &&
+       temperature <= ranges->red_max)
+    {
+        red_pwm = pwm;
+    }
+
+    if(temperature >= ranges->green_min &&
+       temperature <= ranges->green_max)
+    {
+        green_pwm = pwm;
+    }
+
+    if(temperature >= ranges->blue_min &&
+       temperature <= ranges->blue_max)
+    {
+        blue_pwm = pwm;
+    }
+
+    set_led_rgb_given_values(
+        led_rgb,
+        red_pwm,
+        green_pwm,
+        blue_pwm);
+}
+
+/* =====================================================
    ADC CALIBRADO
    ===================================================== */
 
@@ -245,6 +291,7 @@ float calculate_ntc_temperature(
     float resistance_ntc =
         R_FIJA *
         ((VOLTAJE_ENTRADA / voltage) - 1.0f);
+
     float steinhart;
 
     steinhart =
@@ -264,36 +311,7 @@ float calculate_ntc_temperature(
 }
 
 /* =====================================================
-   OBTENER COLOR
-   ===================================================== */
-
-char get_color_from_temperature(
-    float temperature,
-    temp_range_t *ranges)
-{
-    if(temperature >= ranges->red_min &&
-       temperature <= ranges->red_max)
-    {
-        return 'r';
-    }
-
-    if(temperature >= ranges->green_min &&
-       temperature <= ranges->green_max)
-    {
-        return 'g';
-    }
-
-    if(temperature >= ranges->blue_min &&
-       temperature <= ranges->blue_max)
-    {
-        return 'b';
-    }
-
-    return 'r';
-}
-
-/* =====================================================
-   PARSE UART
+   PARSE UART TEMPERATURA
    ===================================================== */
 
 void parse_temperature_command(
@@ -306,7 +324,8 @@ void parse_temperature_command(
 
     int max;
 
-    if(sscanf(data, "%c %d %d",
+    if(sscanf(data,
+              "%c %d %d",
               &color,
               &min,
               &max) == 3)
@@ -317,7 +336,6 @@ void parse_temperature_command(
             case 'r':
 
                 ranges->red_min = min;
-
                 ranges->red_max = max;
 
                 printf("Rango ROJO actualizado\n");
@@ -328,7 +346,6 @@ void parse_temperature_command(
             case 'g':
 
                 ranges->green_min = min;
-
                 ranges->green_max = max;
 
                 printf("Rango VERDE actualizado\n");
@@ -339,7 +356,6 @@ void parse_temperature_command(
             case 'b':
 
                 ranges->blue_min = min;
-
                 ranges->blue_max = max;
 
                 printf("Rango AZUL actualizado\n");
@@ -351,6 +367,71 @@ void parse_temperature_command(
                 printf("Comando inválido\n");
 
                 break;
+        }
+    }
+}
+
+/* =====================================================
+   CONFIG SISTEMA UART
+   ===================================================== */
+
+void parse_system_command(
+    char *data,
+    int *print_interval_ms,
+    char *temperature_unit)
+{
+    char command;
+
+    if(sscanf(data, "%c", &command) != 1)
+    {
+        return;
+    }
+
+    if(command == 'T' || command == 't')
+    {
+        int new_time;
+
+        if(sscanf(data,
+                  "%*c %d",
+                  &new_time) == 1)
+        {
+            *print_interval_ms = new_time;
+
+            printf(
+                "Nuevo tiempo impresión: %d ms\n",
+                *print_interval_ms
+            );
+        }
+    }
+
+    if(command == 'U' || command == 'u')
+    {
+        char unit;
+
+        if(sscanf(data,
+                  "%*c %c",
+                  &unit) == 1)
+        {
+            if(unit == 'C' || unit == 'c')
+            {
+                *temperature_unit = 'C';
+
+                printf("Unidad visual: Celsius\n");
+            }
+
+            if(unit == 'K' || unit == 'k')
+            {
+                *temperature_unit = 'K';
+
+                printf("Unidad visual: Kelvin\n");
+            }
+
+            if(unit == 'F' || unit == 'f')
+            {
+                *temperature_unit = 'F';
+
+                printf("Unidad visual: Fahrenheit\n");
+            }
         }
     }
 }
