@@ -47,6 +47,7 @@
 #include "ntc.h"
 #include "fan.h"
 #include "rgb_led.h"
+#include "curtain_manager.h"
 
 // Tag used for ESP serial console messages
 static const char TAG[] = "http_server";
@@ -1072,6 +1073,69 @@ static esp_err_t http_server_rgb_config_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+static esp_err_t http_server_curtain_config_handler(httpd_req_t *req)
+{
+    char buf[200];
+
+    int len =
+        httpd_req_recv(
+            req,
+            buf,
+            sizeof(buf) - 1);
+
+    if(len <= 0)
+    {
+        return ESP_FAIL;
+    }
+
+    buf[len] = '\0';
+
+    cJSON *root =
+        cJSON_Parse(buf);
+
+    if(root == NULL)
+    {
+        return ESP_FAIL;
+    }
+
+    cJSON *mode =
+        cJSON_GetObjectItem(
+            root,
+            "mode");
+
+    cJSON *percent =
+        cJSON_GetObjectItem(
+            root,
+            "percent");
+
+    if(cJSON_IsNumber(mode))
+    {
+        curtain_set_mode(
+            (uint8_t)mode->valueint);
+    }
+
+    if(cJSON_IsNumber(percent))
+    {
+        curtain_set_manual_percent(
+            (uint8_t)percent->valueint);
+    }
+
+    ESP_LOGI(
+        TAG,
+        "Curtain Mode=%d Percent=%d",
+        mode->valueint,
+        percent->valueint);
+
+    cJSON_Delete(root);
+
+    httpd_resp_send(
+        req,
+        "OK",
+        HTTPD_RESP_USE_STRLEN);
+
+    return ESP_OK;
+}
+
 /**
  * wifiConnect.json handler is invoked after the connect button is pressed
  * and handles receiving the SSID and password entered by the user
@@ -1182,6 +1246,144 @@ static esp_err_t http_server_wifi_connect_json_handler(httpd_req_t *req)
 
     free(ssid_str);
     free(pass_str);
+
+    return ESP_OK;
+}
+
+
+static esp_err_t http_server_ap_config_handler(httpd_req_t *req)
+{
+    size_t header_len;
+    char* header_value;
+    char* ssid_str = NULL;
+    char* pass_str = NULL;
+    int content_length;
+
+    ESP_LOGI(TAG, "/apConfig.json requested");
+
+    header_len =
+        httpd_req_get_hdr_value_len(
+            req,
+            "Content-Length"
+        );
+
+    if(header_len <= 0)
+    {
+        return ESP_FAIL;
+    }
+
+    header_value =
+        (char*)malloc(
+            header_len + 1
+        );
+
+    if(
+        httpd_req_get_hdr_value_str(
+            req,
+            "Content-Length",
+            header_value,
+            header_len + 1
+        ) != ESP_OK
+    )
+    {
+        free(header_value);
+        return ESP_FAIL;
+    }
+
+    content_length =
+        atoi(header_value);
+
+    free(header_value);
+
+    char* data_buffer =
+        (char*)malloc(
+            content_length + 1
+        );
+
+    if(
+        httpd_req_recv(
+            req,
+            data_buffer,
+            content_length
+        ) <= 0
+    )
+    {
+        free(data_buffer);
+        return ESP_FAIL;
+    }
+
+    data_buffer[content_length] = '\0';
+
+    cJSON* root =
+        cJSON_Parse(
+            data_buffer
+        );
+
+    free(data_buffer);
+
+    if(root == NULL)
+    {
+        return ESP_FAIL;
+    }
+
+    cJSON* ssid_json =
+        cJSON_GetObjectItem(
+            root,
+            "ssid"
+        );
+
+    cJSON* pwd_json =
+        cJSON_GetObjectItem(
+            root,
+            "password"
+        );
+
+    if(
+        ssid_json == NULL ||
+        pwd_json == NULL
+    )
+    {
+        cJSON_Delete(root);
+        return ESP_FAIL;
+    }
+
+    ssid_str =
+        strdup(
+            ssid_json->valuestring
+        );
+
+    pass_str =
+        strdup(
+            pwd_json->valuestring
+        );
+
+    cJSON_Delete(root);
+
+    ESP_LOGI(
+        TAG,
+        "AP SSID: %s",
+        ssid_str
+    );
+
+    ESP_LOGI(
+        TAG,
+        "AP PASSWORD: %s",
+        pass_str
+    );
+
+    save_ap_credentials(
+        ssid_str,
+        pass_str
+    );
+
+    free(ssid_str);
+    free(pass_str);
+
+    httpd_resp_send(
+        req,
+        "OK",
+        HTTPD_RESP_USE_STRLEN
+    );
 
     return ESP_OK;
 }
@@ -1372,9 +1574,32 @@ static httpd_handle_t http_server_configure(void)
 				.user_ctx = NULL
 		};
 
+		httpd_uri_t curtain_config_json =
+		{
+				.uri = "/curtainConfig.json",
+				.method = HTTP_POST,
+				.handler = http_server_curtain_config_handler,
+				.user_ctx = NULL
+		};
+        
+        httpd_uri_t ap_config_json =
+		{
+			.uri = "/apConfig.json",
+			.method = HTTP_POST,
+			.handler = http_server_ap_config_handler,
+			.user_ctx = NULL
+		};
+
 		httpd_register_uri_handler(
 			http_server_handle,
 			&temp_config_json
+        
+		);
+
+		httpd_register_uri_handler(
+			http_server_handle,
+			&curtain_config_json
+
 	);
 	
 	httpd_register_uri_handler(
@@ -1394,8 +1619,14 @@ static httpd_handle_t http_server_configure(void)
 				.method = HTTP_POST,
 				.handler = http_server_wifi_connect_status_json_handler,
 				.user_ctx = NULL
+
 		};
+        
+
+
 		httpd_register_uri_handler(http_server_handle, &wifi_connect_status_json);
+        
+
 
 		httpd_uri_t read_range_uri = {
 				.uri = "/readreg.json",
@@ -1404,6 +1635,11 @@ static httpd_handle_t http_server_configure(void)
 				.user_ctx = NULL
 		};
 		httpd_register_uri_handler(http_server_handle, &read_range_uri );
+        
+		httpd_register_uri_handler(
+			http_server_handle,
+			&ap_config_json
+		);
 
 
 

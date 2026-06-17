@@ -1,7 +1,7 @@
 {
     "version":            "1.2",
     "project_name":       "http_sever_and_flash_program",
-    "project_version":    "6c62831",
+    "project_version":    "081965d-dirty",
     "project_path":       "C:/Sistemas_Tiempo_Real/Proyecto_Final_STR",
     "idf_path":           "C:/esp/v5.2.6/esp-idf",
     "build_dir":          "C:/Sistemas_Tiempo_Real/Proyecto_Final_STR/build",
@@ -805,7 +805,7 @@
             "managed_reqs": [],
             "managed_priv_reqs": [],
             "file": "C:/Sistemas_Tiempo_Real/Proyecto_Final_STR/build/esp-idf/main/libmain.a",
-            "sources": [ "C:/Sistemas_Tiempo_Real/Proyecto_Final_STR/main/main.c", "C:/Sistemas_Tiempo_Real/Proyecto_Final_STR/main/rgb_led.c", "C:/Sistemas_Tiempo_Real/Proyecto_Final_STR/main/wifi_app.c", "C:/Sistemas_Tiempo_Real/Proyecto_Final_STR/main/http_server.c", "C:/Sistemas_Tiempo_Real/Proyecto_Final_STR/main/ntc.c", "C:/Sistemas_Tiempo_Real/Proyecto_Final_STR/main/temperature_control.c", "C:/Sistemas_Tiempo_Real/Proyecto_Final_STR/main/fan.c", "C:/Sistemas_Tiempo_Real/Proyecto_Final_STR/build/app.css.S", "C:/Sistemas_Tiempo_Real/Proyecto_Final_STR/build/app.js.S", "C:/Sistemas_Tiempo_Real/Proyecto_Final_STR/build/favicon.ico.S", "C:/Sistemas_Tiempo_Real/Proyecto_Final_STR/build/index.html.S", "C:/Sistemas_Tiempo_Real/Proyecto_Final_STR/build/jquery-3.3.1.min.js.S" ],
+            "sources": [ "C:/Sistemas_Tiempo_Real/Proyecto_Final_STR/main/main.c", "C:/Sistemas_Tiempo_Real/Proyecto_Final_STR/main/rgb_led.c", "C:/Sistemas_Tiempo_Real/Proyecto_Final_STR/main/wifi_app.c", "C:/Sistemas_Tiempo_Real/Proyecto_Final_STR/main/http_server.c", "C:/Sistemas_Tiempo_Real/Proyecto_Final_STR/main/ntc.c", "C:/Sistemas_Tiempo_Real/Proyecto_Final_STR/main/temperature_control.c", "C:/Sistemas_Tiempo_Real/Proyecto_Final_STR/main/fan.c", "C:/Sistemas_Tiempo_Real/Proyecto_Final_STR/main/servo_motor.c", "C:/Sistemas_Tiempo_Real/Proyecto_Final_STR/main/curtain_manager.c", "C:/Sistemas_Tiempo_Real/Proyecto_Final_STR/build/app.css.S", "C:/Sistemas_Tiempo_Real/Proyecto_Final_STR/build/app.js.S", "C:/Sistemas_Tiempo_Real/Proyecto_Final_STR/build/favicon.ico.S", "C:/Sistemas_Tiempo_Real/Proyecto_Final_STR/build/index.html.S", "C:/Sistemas_Tiempo_Real/Proyecto_Final_STR/build/jquery-3.3.1.min.js.S" ],
             "include_dirs": [ "." ]
         },
         "mbedtls": {

@@ -260,6 +260,44 @@ function connectWifi()
 	//startWifiConnectStatusInterval();
 }
 
+function saveAPConfig()
+{
+    let ap_ssid =
+        $("#ap_ssid").val();
+
+    let ap_password =
+        $("#ap_password").val();
+
+    let requestData =
+    {
+        ssid: ap_ssid,
+        password: ap_password
+    };
+
+    $.ajax({
+        url: "/apConfig.json",
+        method: "POST",
+        contentType: "application/json",
+        data: JSON.stringify(requestData),
+
+        success: function()
+        {
+            $("#ap_config_status")
+                .html(
+                    "Configuración AP guardada"
+                );
+        },
+
+        error: function()
+        {
+            $("#ap_config_status")
+                .html(
+                    "Error al guardar"
+                );
+        }
+    });
+}
+
 /**
  * Checks credentials on connect_wifi button click.
  */
@@ -553,6 +591,48 @@ function saveRGBConfig()
     });
 }
 
+function saveCurtainConfig()
+{
+    let mode =
+        parseInt(
+            $("#curtain_mode").val()
+        );
+
+    let percent =
+        parseInt(
+            $("#curtain_percent").val()
+        );
+
+    let requestData =
+    {
+        mode: mode,
+        percent: percent
+    };
+
+    $.ajax({
+        url: "/curtainConfig.json",
+        method: "POST",
+        contentType: "application/json",
+        data: JSON.stringify(requestData),
+
+        success: function()
+        {
+            $("#curtain_status")
+                .html(
+                    "Configuración guardada"
+                );
+        },
+
+        error: function()
+        {
+            $("#curtain_status")
+                .html(
+                    "Error"
+                );
+        }
+    });
+}
+
 $(document).on(
     "input",
     "#rgb_brightness",
@@ -563,7 +643,17 @@ $(document).on(
     }
 );
 
-
+$(document).on(
+    "input",
+    "#curtain_percent",
+    function()
+    {
+        $("#curtain_percent_value")
+            .html(
+                $(this).val() + "%"
+            );
+    }
+);
     
 
 

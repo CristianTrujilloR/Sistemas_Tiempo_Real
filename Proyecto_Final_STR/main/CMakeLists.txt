@@ -1,4 +1,4 @@
-idf_component_register(SRCS "main.c" "rgb_led.c" "wifi_app.c" "http_server.c" "ntc.c" "temperature_control.c" "fan.c" 
+idf_component_register(SRCS "main.c" "rgb_led.c" "wifi_app.c" "http_server.c" "ntc.c" "temperature_control.c" "fan.c" "servo_motor.c" "curtain_manager.c"   
                     PRIV_REQUIRES esp_wifi nvs_flash driver esp_http_server esp_timer app_update json mqtt
 
                     INCLUDE_DIRS "."

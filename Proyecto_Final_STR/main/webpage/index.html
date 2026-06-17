@@ -66,6 +66,53 @@
                     <div class="status" id="wifi_connect_status"></div>
                 </div>
             </section>
+            
+            </section>
+
+            <section class="card" id="APConfig">
+                <div class="card__header">
+                    <p class="eyebrow">Access Point</p>
+                    <h2>Configuración AP ESP32</h2>
+                </div>
+
+                <div class="card__content stack">
+
+                    <label class="field">
+                        <span>SSID ESP32</span>
+                        <input
+                            id="ap_ssid"
+                            type="text"
+                            maxlength="32"
+                            placeholder="Nombre del AP">
+                    </label>
+
+                    <label class="field">
+                        <span>Password ESP32</span>
+                        <input
+                            id="ap_password"
+                            type="text"
+                            maxlength="64"
+                            placeholder="Contraseña del AP">
+                    </label>
+
+                    <div class="actions">
+                        <button
+                            class="btn primary"
+                            type="button"
+                            onclick="saveAPConfig()">
+                            Guardar AP
+                        </button>
+                    </div>
+
+                    <div
+                        class="status"
+                        id="ap_config_status">
+                    </div>
+
+                </div>
+            </section>
+
+
 
             <section class="card" id="DHT22Sensor">
                 <div class="card__header">
@@ -187,6 +234,68 @@
                     <div
                         class="status"
                         id="rgb_status">
+                    </div>
+
+                </div>
+
+            </section>
+            
+            <section class="card" id="CurtainControl">
+
+                <div class="card__header">
+                    <p class="eyebrow">CORTINAS</p>
+                    <h2>Curtain Control</h2>
+                </div>
+
+                <div class="card__content stack">
+
+                    <label class="field">
+                        <span>Modo cortina</span>
+
+                        <select id="curtain_mode">
+                            <option value="0">
+                                Automático
+                            </option>
+
+                            <option value="1">
+                                Manual
+                            </option>
+                        </select>
+                    </label>
+
+                    <label class="field">
+                        <span>Apertura (%)</span>
+
+                        <input
+                            type="range"
+                            id="curtain_percent"
+                            min="0"
+                            max="100"
+                            value="0">
+                    </label>
+
+                    <div class="status">
+                        <span id="curtain_percent_value">
+                            0%
+                        </span>
+                    </div>
+
+                    <div class="actions">
+
+                        <button
+                            class="btn primary"
+                            type="button"
+                            onclick="saveCurtainConfig()">
+
+                            Guardar Cortina
+
+                        </button>
+
+                    </div>
+
+                    <div
+                        class="status"
+                        id="curtain_status">
                     </div>
 
                 </div>

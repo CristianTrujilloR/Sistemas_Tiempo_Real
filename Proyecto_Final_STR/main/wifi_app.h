@@ -86,6 +86,13 @@ bool get_state_time_was_synchronized( void );
 void save_reg_data(uint8_t register, char *str) ;
 void save_wifi_credentials(const char *ssid, const char *password);
 void load_wifi_credentials(char *ssid, char *password);
+void save_ap_credentials(
+    const char *ssid,
+    const char *password);
+
+void load_ap_credentials(
+    char *ssid,
+    char *password);
 static void wifi_app_connect_sta(void);
 void check_sta_connection_state( void *pvParameters );
 void task_compare_hour_to_execute_action( void *pvParameters );

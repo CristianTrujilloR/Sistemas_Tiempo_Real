@@ -21,6 +21,7 @@
 #include "tasks_common.h"
 #include "wifi_app.h"
 #include "esp_sntp.h"
+#include "curtain_manager.h"
 
 // Tag used for ESP serial console messages
 static const char TAG [] = "wifi_app";
@@ -103,6 +104,43 @@ void save_wifi_credentials(const char *ssid, const char *password) {
     ESP_ERROR_CHECK(nvs_set_str(nvs_handle, "wifi_ssid", ssid));
     ESP_ERROR_CHECK(nvs_set_str(nvs_handle, "wifi_password", password));
     ESP_ERROR_CHECK(nvs_commit(nvs_handle));
+    nvs_close(nvs_handle);
+}
+
+void save_ap_credentials(
+    const char *ssid,
+    const char *password)
+{
+    nvs_handle_t nvs_handle;
+
+    ESP_ERROR_CHECK(
+        nvs_open(
+            "storage",
+            NVS_READWRITE,
+            &nvs_handle
+        )
+    );
+
+    ESP_ERROR_CHECK(
+        nvs_set_str(
+            nvs_handle,
+            "ap_ssid",
+            ssid
+        )
+    );
+
+    ESP_ERROR_CHECK(
+        nvs_set_str(
+            nvs_handle,
+            "ap_password",
+            password
+        )
+    );
+
+    ESP_ERROR_CHECK(
+        nvs_commit(nvs_handle)
+    );
+
     nvs_close(nvs_handle);
 }
 
@@ -409,6 +447,70 @@ void load_wifi_credentials(char *ssid, char *password) {
 
     nvs_close(nvs_handle);
 }
+
+void load_ap_credentials(
+    char *ssid,
+    char *password)
+{
+    nvs_handle_t nvs_handle;
+
+    if(
+        nvs_open(
+            "storage",
+            NVS_READONLY,
+            &nvs_handle
+        ) == ESP_OK
+    )
+    {
+        size_t ssid_len = 32;
+        size_t password_len = 64;
+
+        if(
+            nvs_get_str(
+                nvs_handle,
+                "ap_ssid",
+                ssid,
+                &ssid_len
+            ) != ESP_OK
+        )
+        {
+            strcpy(
+                ssid,
+                WIFI_AP_SSID
+            );
+        }
+
+        if(
+            nvs_get_str(
+                nvs_handle,
+                "ap_password",
+                password,
+                &password_len
+            ) != ESP_OK
+        )
+        {
+            strcpy(
+                password,
+                WIFI_AP_PASSWORD
+            );
+        }
+
+        nvs_close(nvs_handle);
+    }
+    else
+    {
+        strcpy(
+            ssid,
+            WIFI_AP_SSID
+        );
+
+        strcpy(
+            password,
+            WIFI_AP_PASSWORD
+        );
+    }
+}
+
 bool nvs_credentials_exist() {
     nvs_handle_t nvs_handle;
     esp_err_t err = nvs_open("storage", NVS_READONLY, &nvs_handle);
@@ -604,6 +706,17 @@ static void wifi_app_default_wifi_init(void)
  */
 static void wifi_app_soft_ap_config(void)
 {
+	char ap_ssid[33];
+	char ap_password[65];
+
+	load_ap_credentials(
+		ap_ssid,
+		ap_password
+	);
+
+	ESP_LOGI(TAG,
+			"AP SSID Loaded: %s",
+			ap_ssid);
 	// SoftAP - WiFi access point configuration
 	wifi_config_t ap_config =
 	{
@@ -618,6 +731,29 @@ static void wifi_app_soft_ap_config(void)
 				.beacon_interval = WIFI_AP_BEACON_INTERVAL,
 		},
 	};
+    
+    memset(ap_config.ap.ssid,
+       0,
+       sizeof(ap_config.ap.ssid));
+
+	memset(ap_config.ap.password,
+		0,
+		sizeof(ap_config.ap.password));
+
+	strncpy(
+		(char*)ap_config.ap.ssid,
+		ap_ssid,
+		sizeof(ap_config.ap.ssid)
+	);
+
+	strncpy(
+		(char*)ap_config.ap.password,
+		ap_password,
+		sizeof(ap_config.ap.password)
+	);
+
+	ap_config.ap.ssid_len =
+		strlen(ap_ssid);
 
 	// Configure DHCP for the AP
 	esp_netif_ip_info_t ap_ip_info;
@@ -803,64 +939,65 @@ bool compare_hour_day_structs (struct tm timeinfo, register_saved_e aux_reg ){
 
 	if( timeinfo.tm_hour == aux_reg.hour ){
 		if( timeinfo.tm_min == aux_reg.min ){
-			// we should activate the motor
-			toogle_led();
+
+			ESP_LOGI(TAG2,
+					"REGISTRO ACTIVADO");
+
+			curtain_set_auto_percent(100);
+
 			vTaskDelay(40000 / portTICK_PERIOD_MS);
+
 			return true;
-		}
-		else{
-			ESP_LOGI(TAG2, "CORRECT DAY CORRECT HOUR WRONG MINUTE");
-			return false;
-		}
-	}
+    }
+}
 	else{
 		ESP_LOGI(TAG2, "CORRECT DAY WRONG HOUR");
 		return false;
 		
 	}
-
+return false;
 }
 
-void task_compare_hour_to_execute_action( void *pvParameters ) {
-	time_t now;
+void task_compare_hour_to_execute_action( void *pvParameters )
+{
+    time_t now;
     struct tm timeinfo;
-	while(get_state_time_was_synchronized() == false){
-		vTaskDelay(10000 / portTICK_PERIOD_MS);
-	}
-       // Asegurar que localtime_r inicialice adecuadamente timeinfo
-    
 
-	while (1){
+    while(get_state_time_was_synchronized() == false)
+    {
+        vTaskDelay(10000 / portTICK_PERIOD_MS);
+    }
 
-		ESP_LOGI(TAG, "COMPARING HOURS");
+    while (1)
+    {
+        ESP_LOGI(TAG, "COMPARING HOURS");
 
+        if (time(&now) != -1 &&
+            localtime_r(&now, &timeinfo) != NULL)
+        {
+            ESP_LOGI(TAG,
+                     "Día de la semana: %d, Hora: %d:%d:%d",
+                     timeinfo.tm_wday,
+                     timeinfo.tm_hour,
+                     timeinfo.tm_min,
+                     timeinfo.tm_sec);
+        }
 
-		if (time(&now) != -1 && localtime_r(&now, &timeinfo) != NULL)
-   		{
-   		    // Imprimir la hora actual
-   		   // ESP_LOGI(TAG, "Día de la semana: %d, Hora: %02d:%02d:%02d", timeinfo.tm_wday, timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
-			ESP_LOGI(TAG, "Día de la semana: %d, Hora: %d:%d:%d", timeinfo.tm_wday, timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
-			
-   		}
-   		else
-		{
-		    ESP_LOGE(TAG, "Error al obtener la hora actual.");
-		}
+        for(int i = 0; i < NUM_REGISTERS_AV; i++)
+        {
+            ESP_LOGI(TAG,
+                     "Revisando registro: %d",
+                     i);
 
-		for(int i = 0; i< NUM_REGISTERS_AV; i++){
-			ESP_LOGI(TAG, "Revisando registro: %d", i);
-			compare_hour_day_structs (timeinfo,  register_readings_from_flash[i] );
+            compare_hour_day_structs(
+                timeinfo,
+                register_readings_from_flash[i]
+            );
+        }
 
-		}
-
-		vTaskDelay(30000 / portTICK_PERIOD_MS);
-	}
-
-
+        vTaskDelay(30000 / portTICK_PERIOD_MS);
+    }
 }
-
-
-
 
 
 void wifi_app_start(void)

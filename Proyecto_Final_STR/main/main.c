@@ -9,6 +9,8 @@
 #include "fan.h"
 #include "temperature_control.h"
 #include "rgb_led.h"
+#include "servo_motor.h"
+#include "curtain_manager.h"
 #define BLINK_GPIO 2
 
 static void configure_led(void)
@@ -52,7 +54,13 @@ void app_main(void)
     // Inicializar RGB LED
     rgb_led_init();
 
-    rgb_led_set_color(255,0,0);
-    rgb_led_set_brightness(100);
+    // Inicializar servo motor
+    servo_init();
+
+    // Inicializar gestor de cortinas
+    curtain_init();
+    curtain_set_mode(1);
+
+    curtain_set_manual_percent(50);
     
 }
